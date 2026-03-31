@@ -1,10 +1,58 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_daftar_movie/models/movie.dart';
+import 'package:flutter_daftar_movie/services/favorite_service.dart';
 
-class DetailScreen extends StatelessWidget {
+class DetailScreen extends StatefulWidget {
   final Movie movie;
 
   const DetailScreen({super.key, required this.movie});
+
+  @override
+  State<DetailScreen> createState() => _DetailScreenState();
+}
+
+class _DetailScreenState extends State<DetailScreen> {
+  bool _isFavorite = false;
+  bool _checking = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkFavorite();
+  }
+
+  Future<void> _checkFavorite() async {
+    setState(() => _checking = true);
+    final isFav = await FavoriteService.isFavorite(widget.movie.id);
+    if (mounted) {
+      setState(() {
+        _isFavorite = isFav;
+        _checking = false;
+      });
+    }
+  }
+
+  Future<void> _toggleFavorite() async {
+    setState(() => _checking = true);
+    bool success;
+    String message;
+    if (_isFavorite) {
+      success = await FavoriteService.removeMovie(widget.movie.id);
+      message = 'Dihapus dari favorit!';
+      if (success) _isFavorite = false;
+    } else {
+      success = await FavoriteService.addMovie(widget.movie);
+      message = 'Ditambahkan ke favorit!';
+      if (success) _isFavorite = true;
+    }
+    setState(() => _checking = false);
+    if (success && mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -17,20 +65,74 @@ class DetailScreen extends StatelessWidget {
             decoration: BoxDecoration(
               image: DecorationImage(
                 image: NetworkImage(
-                  'https://image.tmdb.org/t/p/w500${movie.posterPath}',
+                  'https://image.tmdb.org/t/p/w500${widget.movie.posterPath}',
                 ),
                 fit: BoxFit.cover,
               ),
             ),
           ),
+          // Love favorite button - visible on top
+          Positioned(
+            bottom: 40,
+            right: 20,
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(50),
+                onTap: _checking ? null : _toggleFavorite,
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.7),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.5),
+                        blurRadius: 12,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: _checking
+                      ? const SizedBox(
+                          width: 28,
+                          height: 28,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 3,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.white,
+                            ),
+                          ),
+                        )
+                      : Icon(
+                          _isFavorite ? Icons.favorite : Icons.favorite_border,
+                          color: _isFavorite ? Colors.redAccent : Colors.white,
+                          size: 36,
+                          shadows: [
+                            Shadow(
+                              offset: const Offset(2, 2),
+                              blurRadius: 4,
+                              color: Colors.black87,
+                            ),
+                          ],
+                        ),
+                ),
+              ),
+            ),
+          ),
           // Overlay gradient untuk readability
-          Container(
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
             height: MediaQuery.of(context).size.height * 0.6,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Colors.transparent, Colors.black.withOpacity(0.8)],
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Colors.transparent, Colors.black.withOpacity(0.6)],
+                ),
               ),
             ),
           ),
@@ -46,7 +148,6 @@ class DetailScreen extends StatelessWidget {
                       vertical: 8.0,
                     ),
                     child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         IconButton(
                           icon: const Icon(
@@ -55,27 +156,13 @@ class DetailScreen extends StatelessWidget {
                           ),
                           onPressed: () => Navigator.pop(context),
                         ),
-                        IconButton(
-                          icon: const Icon(
-                            Icons.favorite_border,
-                            color: Colors.white,
-                          ),
-                          onPressed: () {
-                            // Aksi tambah ke favorit (bisa diimplementasikan nanti)
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Ditambahkan ke favorit!'),
-                              ),
-                            );
-                          },
-                        ),
                       ],
                     ),
                   ),
                 ),
                 // Hero animasi untuk poster
                 Hero(
-                  tag: movie.posterPath,
+                  tag: widget.movie.posterPath ?? widget.movie.id.toString(),
                   child: Container(
                     margin: const EdgeInsets.only(top: 100),
                     height: 200,
@@ -91,7 +178,7 @@ class DetailScreen extends StatelessWidget {
                       ],
                       image: DecorationImage(
                         image: NetworkImage(
-                          'https://image.tmdb.org/t/p/w500${movie.posterPath}',
+                          'https://image.tmdb.org/t/p/w500${widget.movie.posterPath}',
                         ),
                         fit: BoxFit.cover,
                       ),
@@ -114,7 +201,7 @@ class DetailScreen extends StatelessWidget {
                         children: [
                           // Judul film
                           Text(
-                            movie.title,
+                            widget.movie.title,
                             style: const TextStyle(
                               fontSize: 24,
                               fontWeight: FontWeight.bold,
@@ -132,7 +219,7 @@ class DetailScreen extends StatelessWidget {
                               ),
                               const SizedBox(width: 4),
                               Text(
-                                '${movie.voteAverage?.toStringAsFixed(1) ?? 'N/A'} / 10',
+                                '${widget.movie.voteAverage?.toStringAsFixed(1) ?? 'N/A'} / 10',
                                 style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w500,
@@ -146,7 +233,8 @@ class DetailScreen extends StatelessWidget {
                               ),
                               const SizedBox(width: 4),
                               Text(
-                                movie.releaseDate ?? 'Tanggal tidak tersedia',
+                                widget.movie.releaseDate ??
+                                    'Tanggal tidak tersedia',
                                 style: const TextStyle(
                                   fontSize: 16,
                                   color: Colors.grey,
@@ -165,7 +253,8 @@ class DetailScreen extends StatelessWidget {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            movie.overview ?? 'Deskripsi tidak tersedia.',
+                            widget.movie.overview ??
+                                'Deskripsi tidak tersedia.',
                             style: const TextStyle(fontSize: 16, height: 1.5),
                           ),
                           const SizedBox(height: 20),
@@ -175,7 +264,6 @@ class DetailScreen extends StatelessWidget {
                             children: [
                               ElevatedButton.icon(
                                 onPressed: () {
-                                  // Aksi tonton trailer (bisa integrasi dengan YouTube atau API)
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
                                       content: Text('Trailer akan dibuka!'),
@@ -194,7 +282,6 @@ class DetailScreen extends StatelessWidget {
                               ),
                               OutlinedButton.icon(
                                 onPressed: () {
-                                  // Aksi bagikan
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(content: Text('Dibagikan!')),
                                   );
