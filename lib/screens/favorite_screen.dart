@@ -25,13 +25,16 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
   Future<void> _loadFavorites() async {
     final prefs = await SharedPreferences.getInstance();
     final favoriteIds = prefs.getStringList('favorite_movies') ?? [];
+
     if (favoriteIds.isEmpty) {
-      setState(() => _loading = false);
+      setState(() {
+        _loading = false;
+      });
       return;
     }
 
-    // Asumsi API bisa fetch by ID, atau load dari all movies
     final allMovies = await _apiService.getAllMovies();
+
     final favorites = allMovies
         .map((e) => Movie.fromJson(e))
         .where((m) => favoriteIds.contains(m.id.toString()))
@@ -47,20 +50,22 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[100],
+
       appBar: AppBar(
+        title: const Text("Favorite Movies"),
         backgroundColor: Colors.white,
         elevation: 1,
-        title: const Text(
-          'Film Favorit',
-          style: TextStyle(color: Colors.black87),
-        ),
-        centerTitle: false,
-        iconTheme: const IconThemeData(color: Colors.black87),
       ),
+
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _favoriteMovies.isEmpty
-          ? const Center(child: Text('Belum ada film favorit'))
+          ? const Center(
+              child: Text(
+                "Belum ada film favorit",
+                style: TextStyle(fontSize: 16),
+              ),
+            )
           : ListView.builder(
               padding: const EdgeInsets.all(16),
               itemCount: _favoriteMovies.length,
@@ -76,9 +81,12 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: GestureDetector(
-        onTap: () => Navigator.of(
-          context,
-        ).push(MaterialPageRoute(builder: (_) => DetailScreen(movie: movie))),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => DetailScreen(movie: movie)),
+          );
+        },
         child: Card(
           elevation: 4,
           shape: RoundedRectangleBorder(
@@ -95,19 +103,18 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
                     bottomLeft: Radius.circular(12),
                   ),
                   child: Image.network(
-                    'https://image.tmdb.org/t/p/w500${movie.posterPath}',
+                    "https://image.tmdb.org/t/p/w500${movie.posterPath}",
                     fit: BoxFit.cover,
-                    errorBuilder: (c, e, s) => Container(
-                      color: Colors.grey[300],
-                      child: const Icon(
-                        Icons.movie,
-                        color: Colors.white54,
-                        size: 50,
-                      ),
-                    ),
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        color: Colors.grey,
+                        child: const Icon(Icons.movie, size: 40),
+                      );
+                    },
                   ),
                 ),
               ),
+
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.all(12),
@@ -123,12 +130,14 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 4),
+
+                      const SizedBox(height: 6),
+
                       Text(
-                        movie.overview ?? 'No description',
+                        movie.overview,
                         maxLines: 3,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(color: Colors.grey[600]),
+                        style: const TextStyle(color: Colors.grey),
                       ),
                     ],
                   ),
